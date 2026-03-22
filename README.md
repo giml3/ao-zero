@@ -12,6 +12,7 @@ This application is structured for local deployment using Docker and Ansible.
    ```bash
    ansible-playbook -i hosts.ini deploy.yml
    ```
+   *(Note: If you are on Linux and Ansible needs to install Docker, you may be prompted for a sudo password. If it fails, run it with the `-K` flag: `ansible-playbook -i hosts.ini deploy.yml -K`)*
 
 This will:
 - Ensure Docker is installed and running.

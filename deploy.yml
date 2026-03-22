@@ -2,29 +2,33 @@
 - name: Deploy AO - The Overgod Locally
   hosts: localhost
   connection: local
-  become: yes
+  # Removed global 'become: yes' to prevent sudo prompts on macOS for docker commands
   vars:
     project_dir: "{{ ansible_env.PWD }}"
     ollama_model: "llama3"
 
   tasks:
-    - name: Ensure Docker is installed
+    - name: Ensure Docker is installed (Linux only)
       package:
         name: docker.io
         state: present
+      become: yes
       when: ansible_os_family == "Debian"
 
-    - name: Ensure Docker Compose is installed
+    - name: Ensure Docker Compose is installed (Linux only)
       package:
         name: docker-compose
         state: present
+      become: yes
       when: ansible_os_family == "Debian"
 
-    - name: Ensure Docker service is started
+    - name: Ensure Docker service is started (Linux only)
       service:
         name: docker
         state: started
         enabled: yes
+      become: yes
+      when: ansible_os_family == "Debian" or ansible_os_family == "RedHat"
 
     - name: Build and start containers with Docker Compose
       community.docker.docker_compose_v2:
@@ -47,8 +51,7 @@
       delay: 5
 
     - name: Pull the local model in Ollama
-      command: "docker exec -it {{ (output.containers | selectattr('service', 'equalto', 'ollama') | first).name }} ollama pull {{ ollama_model }}"
-      when: output is changed or ollama_status.status == 200
+      command: "docker compose -f {{ project_dir }}/docker-compose.yml exec -T ollama ollama pull {{ ollama_model }}"
       ignore_errors: yes
 
     - name: Deployment Summary
