@@ -4,7 +4,7 @@
   connection: local
   # Removed global 'become: yes' to prevent sudo prompts on macOS for docker commands
   vars:
-    project_dir: "{{ ansible_env.PWD }}"
+    project_dir: "{{ playbook_dir }}"
     ollama_model: "llama3"
 
   tasks:
@@ -13,14 +13,14 @@
         name: docker.io
         state: present
       become: yes
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     - name: Ensure Docker Compose is installed (Linux only)
       package:
         name: docker-compose
         state: present
       become: yes
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     - name: Ensure Docker service is started (Linux only)
       service:
@@ -28,13 +28,12 @@
         state: started
         enabled: yes
       become: yes
-      when: ansible_os_family == "Debian" or ansible_os_family == "RedHat"
+      when: ansible_facts['os_family'] == "Debian" or ansible_facts['os_family'] == "RedHat"
 
-    - name: Build and start containers with Docker Compose
-      community.docker.docker_compose_v2:
-        project_src: "{{ project_dir }}"
-        state: present
-        build: always
+    - name: Build and start containers with Docker Compose CLI
+      command: docker compose up -d --build
+      args:
+        chdir: "{{ project_dir }}"
       register: output
 
     - name: Show Docker Compose output
