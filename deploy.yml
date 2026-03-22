@@ -1,0 +1,56 @@
+---
+- name: Deploy AO - The Overgod Locally
+  hosts: localhost
+  connection: local
+  become: yes
+  vars:
+    project_dir: "{{ ansible_env.PWD }}"
+    ollama_model: "llama3"
+
+  tasks:
+    - name: Ensure Docker is installed
+      package:
+        name: docker.io
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Docker Compose is installed
+      package:
+        name: docker-compose
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Docker service is started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Build and start containers with Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_dir }}"
+        state: present
+        build: always
+      register: output
+
+    - name: Show Docker Compose output
+      debug:
+        var: output
+
+    - name: Wait for Ollama to be ready
+      uri:
+        url: "http://localhost:11434/api/tags"
+        status_code: 200
+      register: ollama_status
+      until: ollama_status.status == 200
+      retries: 10
+      delay: 5
+
+    - name: Pull the local model in Ollama
+      command: "docker exec -it {{ (output.containers | selectattr('service', 'equalto', 'ollama') | first).name }} ollama pull {{ ollama_model }}"
+      when: output is changed or ollama_status.status == 200
+      ignore_errors: yes
+
+    - name: Deployment Summary
+      debug:
+        msg: "AO is manifest at http://localhost:3000. Consult the Overgod wisely."

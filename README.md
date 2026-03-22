@@ -1,11 +1,33 @@
-<div align="center">
+# AO - The Overgod Deployment
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+This application is structured for local deployment using Docker and Ansible.
 
-  <h1>Built with AI Studio</h2>
+## Prerequisites
+- Docker & Docker Compose
+- Ansible
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## Local Deployment with Ansible
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+1. **Run the Playbook:**
+   ```bash
+   ansible-playbook -i hosts.ini deploy.yml
+   ```
 
-</div>
+This will:
+- Ensure Docker is installed and running.
+- Build the application container.
+- Start the Ollama container.
+- Pull the `llama3` model automatically.
+- Expose the app at `http://localhost:3000`.
+
+## Manual Deployment
+
+If you prefer not to use Ansible:
+```bash
+docker-compose up --build -d
+docker exec -it ao-the-overgod-ollama-1 ollama pull llama3
+```
+
+## Configuration
+- **Ollama URL:** Defaults to `http://ollama:11434` inside the Docker network.
+- **Model:** Default is `llama3`. You can change this in `deploy.yml` or `App.tsx`.

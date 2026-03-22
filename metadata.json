@@ -1,0 +1,5 @@
+{
+  "name": "AO - The Overgod",
+  "description": "A cosmic interface to consult AO, the Overgod of the Forgotten Realms, using local LLMs or Gemini.",
+  "requestFramePermissions": []
+}
