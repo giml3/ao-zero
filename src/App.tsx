@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, Send, Info, Settings, Database, Cpu, Trash2, ChevronDown } from "lucide-react";
+import { Sparkles, Send, Info, Settings, Database, Cpu, Trash2, ChevronDown, Download } from "lucide-react";
 
 // Types
 interface Message {
@@ -27,6 +27,9 @@ export default function App() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [selectedOllamaModel, setSelectedOllamaModel] = useState<string>('llama3');
   const [showSettings, setShowSettings] = useState(false);
+  const [pullModelName, setPullModelName] = useState('');
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullProgress, setPullProgress] = useState<{ status: string; completed: number; total: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,6 +55,60 @@ export default function App() {
       }
     } catch (error) {
       console.error("Failed to fetch Ollama models:", error);
+    }
+  };
+
+  const handlePullModel = async () => {
+    if (!pullModelName.trim() || isPulling) return;
+    setIsPulling(true);
+    setPullProgress({ status: 'Starting pull...', completed: 0, total: 100 });
+
+    try {
+      const response = await fetch('/api/ollama/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: pullModelName.trim() })
+      });
+
+      if (!response.ok) throw new Error('Pull failed');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(Boolean);
+
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line);
+              if (data.status) {
+                setPullProgress({
+                  status: data.status,
+                  completed: data.completed || 0,
+                  total: data.total || 100
+                });
+              }
+            } catch (e) {
+              // ignore parse errors for incomplete chunks
+            }
+          }
+        }
+      }
+      setPullProgress(null);
+      setSelectedOllamaModel(pullModelName.trim());
+      setPullModelName('');
+      fetchOllamaModels();
+    } catch (error) {
+      console.error(error);
+      setPullProgress({ status: 'Error pulling model', completed: 0, total: 100 });
+      setTimeout(() => setPullProgress(null), 3000);
+    } finally {
+      setIsPulling(false);
     }
   };
 
@@ -262,26 +319,67 @@ export default function App() {
               </div>
 
               {useOllama && (
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase tracking-widest text-orange-400/70 font-sans font-bold flex items-center gap-2">
-                    <Database className="w-3 h-3" /> Local Model
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={selectedOllamaModel}
-                      onChange={(e) => setSelectedOllamaModel(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs font-sans text-white focus:outline-none focus:border-orange-500/50 appearance-none cursor-pointer"
-                    >
-                      {availableModels.length === 0 && (
-                        <option value="llama3">llama3 (default)</option>
-                      )}
-                      {availableModels.map((model) => (
-                        <option key={model} value={model} className="bg-[#050505] text-white">
-                          {model}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest text-orange-400/70 font-sans font-bold flex items-center gap-2">
+                      <Database className="w-3 h-3" /> Local Model
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedOllamaModel}
+                        onChange={(e) => setSelectedOllamaModel(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs font-sans text-white focus:outline-none focus:border-orange-500/50 appearance-none cursor-pointer"
+                      >
+                        {availableModels.length === 0 && (
+                          <option value="llama3">llama3 (default)</option>
+                        )}
+                        {availableModels.map((model) => (
+                          <option key={model} value={model} className="bg-[#050505] text-white">
+                            {model}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-white/10">
+                    <label className="text-[10px] uppercase tracking-widest text-orange-400/70 font-sans font-bold flex items-center gap-2">
+                      <Download className="w-3 h-3" /> Pull New Model
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={pullModelName}
+                        onChange={(e) => setPullModelName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handlePullModel()}
+                        placeholder="e.g., mistral"
+                        className="flex-1 bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs font-sans text-white focus:outline-none focus:border-orange-500/50 placeholder:text-white/20"
+                      />
+                      <button
+                        onClick={handlePullModel}
+                        disabled={isPulling || !pullModelName.trim()}
+                        className="px-3 py-2 bg-orange-500/20 hover:bg-orange-500/40 border border-orange-500/50 rounded-xl transition-all disabled:opacity-30 text-xs font-sans text-orange-400"
+                      >
+                        Pull
+                      </button>
+                    </div>
+                    {pullProgress && (
+                      <div className="space-y-1.5 mt-2">
+                        <div className="flex justify-between text-[10px] font-sans text-white/50">
+                          <span className="truncate pr-2">{pullProgress.status}</span>
+                          {pullProgress.total > 100 && (
+                            <span className="shrink-0">{Math.round((pullProgress.completed / pullProgress.total) * 100)}%</span>
+                          )}
+                        </div>
+                        <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-orange-500 transition-all duration-300"
+                            style={{ width: (pullProgress.total > 100 ? (pullProgress.completed / pullProgress.total) * 100 : 100) + '%' }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

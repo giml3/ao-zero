@@ -30,6 +30,34 @@ async function startServer() {
     }
   });
 
+  // API Proxy for Ollama pull (download models)
+  app.post("/api/ollama/pull", async (req, res) => {
+    const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
+    try {
+      const response = await fetch(`${ollamaUrl}/api/pull`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      });
+      if (!response.ok) {
+        throw new Error(`Ollama error: ${response.statusText}`);
+      }
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader available");
+
+      res.setHeader("Content-Type", "application/x-ndjson");
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+      res.end();
+    } catch (error) {
+      console.error("Ollama Pull Error:", error);
+      res.status(500).json({ error: "Failed to pull model from Ollama" });
+    }
+  });
+
   // API Proxy for Ollama to handle CORS and local networking in Docker
   app.post("/api/ollama", async (req, res) => {
     const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
