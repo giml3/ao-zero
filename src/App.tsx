@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, Send, Info, Settings, Database, Cpu, Trash2 } from "lucide-react";
+import { Sparkles, Send, Info, Settings, Database, Cpu, Trash2, ChevronDown } from "lucide-react";
 
 // Types
 interface Message {
@@ -24,6 +24,8 @@ export default function App() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [useOllama, setUseOllama] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [selectedOllamaModel, setSelectedOllamaModel] = useState<string>('llama3');
   const [showSettings, setShowSettings] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -32,6 +34,26 @@ export default function App() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (showSettings && useOllama) {
+      fetchOllamaModels();
+    }
+  }, [showSettings, useOllama]);
+
+  const fetchOllamaModels = async () => {
+    try {
+      const response = await fetch('/api/ollama/tags');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.models && Array.isArray(data.models)) {
+          setAvailableModels(data.models.map((m: any) => m.name));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch Ollama models:", error);
+    }
+  };
 
   const handleClearChat = () => {
     setMessages([
@@ -81,7 +103,7 @@ export default function App() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama3', // Default model
+        model: selectedOllamaModel,
         prompt: `${AO_SYSTEM_INSTRUCTION}\n\nUser: ${prompt}\nAO:`,
         stream: false
       }),
@@ -238,6 +260,31 @@ export default function App() {
                   </button>
                 </div>
               </div>
+
+              {useOllama && (
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest text-orange-400/70 font-sans font-bold flex items-center gap-2">
+                    <Database className="w-3 h-3" /> Local Model
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedOllamaModel}
+                      onChange={(e) => setSelectedOllamaModel(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs font-sans text-white focus:outline-none focus:border-orange-500/50 appearance-none cursor-pointer"
+                    >
+                      {availableModels.length === 0 && (
+                        <option value="llama3">llama3 (default)</option>
+                      )}
+                      {availableModels.map((model) => (
+                        <option key={model} value={model} className="bg-[#050505] text-white">
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+                  </div>
+                </div>
+              )}
 
               <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
                 <div className="flex items-center gap-2 text-orange-400/70">

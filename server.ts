@@ -14,6 +14,22 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // API Proxy for Ollama tags (models list)
+  app.get("/api/ollama/tags", async (req, res) => {
+    const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
+    try {
+      const response = await fetch(`${ollamaUrl}/api/tags`);
+      if (!response.ok) {
+        throw new Error(`Ollama error: ${response.statusText}`);
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Ollama Tags Error:", error);
+      res.status(500).json({ error: "Failed to fetch models from Ollama" });
+    }
+  });
+
   // API Proxy for Ollama to handle CORS and local networking in Docker
   app.post("/api/ollama", async (req, res) => {
     const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
